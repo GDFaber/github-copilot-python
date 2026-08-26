@@ -42,6 +42,18 @@ python app.py
 
 7. Open http://127.0.0.1:5000 in your browser.
 
+## Testing
+
+> Note for reviewers: This testing information was added on behalf of the learner and was not included in the original Udacity starter project materials.
+
+- Testing framework: `unittest` (Python standard library)
+- Test location: `starter/tests/`
+- Run all tests from `starter/`:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
 ## Project Instructions
 
 Use GitHub Copilot to refactor the code for this game to add more advanced features. The goal is to create a more modern and maintainable codebase and add additional functionality to the final product. You can use any combination of code completion and chat features, like Ask, Edit, or Agent modes.
