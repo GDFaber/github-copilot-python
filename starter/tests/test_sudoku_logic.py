@@ -6,6 +6,13 @@ import sudoku_logic
 
 
 class TestSudokuLogic(unittest.TestCase):
+    def _assert_not_safe(self, set_row, set_col, check_row, check_col, num):
+        board = sudoku_logic.create_empty_board()
+        board[set_row][set_col] = num
+
+        self.assertFalse(sudoku_logic.is_safe(board, check_row, check_col, num))
+
+
     def test_deep_copy_returns_independent_board(self):
         original = sudoku_logic.create_empty_board()
         original[0][0] = 7
@@ -27,24 +34,15 @@ class TestSudokuLogic(unittest.TestCase):
 
 
     def test_is_safe_false_when_number_in_row(self):
-        board = sudoku_logic.create_empty_board()
-        board[0][5] = 4
-
-        self.assertFalse(sudoku_logic.is_safe(board, 0, 0, 4))
+        self._assert_not_safe(0, 5, 0, 0, 4)
 
 
     def test_is_safe_false_when_number_in_column(self):
-        board = sudoku_logic.create_empty_board()
-        board[6][0] = 8
-
-        self.assertFalse(sudoku_logic.is_safe(board, 0, 0, 8))
+        self._assert_not_safe(6, 0, 0, 0, 8)
 
 
     def test_is_safe_false_when_number_in_box(self):
-        board = sudoku_logic.create_empty_board()
-        board[1][1] = 9
-
-        self.assertFalse(sudoku_logic.is_safe(board, 2, 2, 9))
+        self._assert_not_safe(1, 1, 2, 2, 9)
 
 
     def test_is_safe_true_when_valid_placement(self):

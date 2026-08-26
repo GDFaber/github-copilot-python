@@ -10,6 +10,38 @@ class AppTestCase(unittest.TestCase):
         self.app.testing = True
 
 
+    def _assert_new_game_puzzle(self, url, expected_clues):
+        response = self.app.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # get value from 'puzzle' key and check if it's a 9x9 grid
+        data = response.get_json()
+        self.assertIn('puzzle', data)
+        puzzle = data['puzzle']
+        self.assertEqual(len(puzzle), SIZE)
+
+        # check if each row has 9 elements and each cell is in the range 0-9
+        for row in puzzle:
+            self.assertEqual(len(row), SIZE)
+            for cell in row:
+                self.assertIn(cell, range(10))  # Cells should be in range 0-9
+
+        # check if there are exactly the expected number of clues (non-zero cells) in the puzzle
+        clues_count = sum(cell != 0 for row in puzzle for cell in row)
+        self.assertEqual(clues_count, expected_clues)
+
+
+    def _check_board(self, board, expected_status, expected_data_key, expected_data_value=None):
+        response = self.app.post('/check', json={'board': board})
+        self.assertEqual(response.status_code, expected_status)
+        data = response.get_json()
+        self.assertIn(expected_data_key, data)
+        if expected_data_value is not None:
+            self.assertEqual(data[expected_data_key], expected_data_value)
+        else:
+            self.assertTrue(data[expected_data_key])
+
+
     def test_index_route(self):
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
@@ -17,45 +49,11 @@ class AppTestCase(unittest.TestCase):
 
 
     def test_new_game_route_default(self):
-        response = self.app.get('/new')
-        self.assertEqual(response.status_code, 200)
-
-        # get value from 'puzzle' key and check if it's a 9x9 grid
-        data = response.get_json()
-        self.assertIn('puzzle', data)
-        puzzle = data['puzzle']
-        self.assertEqual(len(puzzle), SIZE)
-
-        # check if each row has 9 elements and each cell is in the range 0-9
-        for row in puzzle:
-            self.assertEqual(len(row), SIZE)
-            for cell in row:
-                self.assertIn(cell, range(10))  # Cells should be in range 0-9
-
-        # check if there are exactly 35 clues (non-zero cells) in the puzzle
-        clues_count = sum(cell != 0 for row in puzzle for cell in row)
-        self.assertEqual(clues_count, 35)
+        self._assert_new_game_puzzle('/new', 35)
 
 
     def test_new_game_route_with_clues_arg(self):
-        response = self.app.get('/new?clues=10')
-        self.assertEqual(response.status_code, 200)
-
-        # get value from 'puzzle' key and check if it's a 9x9 grid
-        data = response.get_json()
-        self.assertIn('puzzle', data)
-        puzzle = data['puzzle']
-        self.assertEqual(len(puzzle), SIZE)
-
-        # check if each row has 9 elements and each cell is in the range 0-9
-        for row in puzzle:
-            self.assertEqual(len(row), SIZE)
-            for cell in row:
-                self.assertIn(cell, range(10))  # Cells should be in range 0-9
-
-        # check if there are exactly 10 clues (non-zero cells) in the puzzle
-        clues_count = sum(cell != 0 for row in puzzle for cell in row)
-        self.assertEqual(clues_count, 10)
+        self._assert_new_game_puzzle('/new?clues=10', 10)
 
 
     def test_check_route_without_game(self):
@@ -66,11 +64,7 @@ class AppTestCase(unittest.TestCase):
 
         # Now, check the solution with an empty board (all zeros)
         empty_board = [[0 for _ in range(SIZE)] for _ in range(SIZE)]
-        response = self.app.post('/check', json={'board': empty_board})
-        self.assertEqual(response.status_code, 400)
-        data = response.get_json()
-        self.assertIn('error', data)
-        self.assertEqual(data['error'], 'No game in progress')
+        self._check_board(empty_board, 400, "error", "No game in progress")
 
 
     def test_check_route_with_incorrect_solution(self):
@@ -79,11 +73,9 @@ class AppTestCase(unittest.TestCase):
 
         # Now, check the solution with an empty board (all zeros)
         empty_board = [[0 for _ in range(SIZE)] for _ in range(SIZE)]
-        response = self.app.post('/check', json={'board': empty_board})
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIn('incorrect', data)
-        self.assertTrue(data['incorrect'])
+
+        # The response should contain the 'incorrect' key, which lists the incorrect cells
+        self._check_board(empty_board, 200, "incorrect")
 
 
     def test_check_route_with_correct_solution(self):
@@ -94,12 +86,8 @@ class AppTestCase(unittest.TestCase):
         from app import CURRENT
         solution = CURRENT['solution']
 
-        # Now, check the solution with the correct board
-        response = self.app.post('/check', json={'board': solution})
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIn('incorrect', data)
-        self.assertEqual(data['incorrect'], [])  # No incorrect cells
+        # Now, check the solution with the correct board (no incorrect cells)
+        self._check_board(solution, 200, "incorrect", [])
         
 
 if __name__ == '__main__':
