@@ -7,6 +7,34 @@ const CLUES_BY_DIFFICULTY = {
   hard: 30
 };
 let puzzle = [];
+let timerInterval = null;
+let timerStart = 0;
+
+function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function updateTimer() {
+  const elapsedSeconds = Math.floor((Date.now() - timerStart) / 1000);
+  document.getElementById('timer').innerText = `Time: ${formatTime(elapsedSeconds)}`;
+}
+
+function startTimer() {
+  if (timerInterval !== null) clearInterval(timerInterval);
+  timerStart = Date.now();
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval !== null) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    updateTimer();
+  }
+}
 
 function getBoardInputs() {
   return Array.from(document.querySelectorAll('#sudoku-board .sudoku-cell'));
@@ -160,6 +188,7 @@ function renderPuzzle(puz) {
 }
 
 async function newGame() {
+  startTimer();
   clearInvalidFeedback();
   const difficulty = document.getElementById('difficulty-select').value;
   const clues = CLUES_BY_DIFFICULTY[difficulty];
@@ -242,6 +271,7 @@ async function checkSolution() {
     }
   }
   if (incorrect.size === 0) {
+    stopTimer();
     msg.style.color = '#388e3c';
     msg.innerText = 'Congratulations! You solved it!';
   } else {
