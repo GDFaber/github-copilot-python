@@ -47,6 +47,10 @@ class AppTestCase(unittest.TestCase):
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'<title>Sudoku Game</title>', response.data)
+        self.assertIn(b'<select id="difficulty-select">', response.data)
+        self.assertIn(b'<option value="easy">Easy</option>', response.data)
+        self.assertIn(b'<option value="medium" selected>Medium</option>', response.data)
+        self.assertIn(b'<option value="hard">Hard</option>', response.data)
 
 
     def test_new_game_route_default(self):
