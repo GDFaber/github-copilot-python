@@ -6,6 +6,11 @@ EMPTY = 0
 MIN_CLUES = 17
 MAX_CLUES = SIZE * SIZE
 MAX_GENERATION_ATTEMPTS = 20
+DIFFICULTY_MULTIPLIERS = {
+    'easy': 1.0,
+    'medium': 1.35,
+    'hard': 1.8,
+}
 
 def deep_copy(board):
     return copy.deepcopy(board)
@@ -30,6 +35,17 @@ def is_safe(board, row, col, num):
 def validate_clues(clues):
     if not isinstance(clues, int) or not MIN_CLUES <= clues <= MAX_CLUES:
         raise ValueError(f"Clues must be between {MIN_CLUES} and {MAX_CLUES}")
+
+def calculate_score(time_taken, hints_taken, difficulty):
+    """Calculate a Sudoku score from elapsed time, hints, and difficulty."""
+    if time_taken < 0 or hints_taken < 0:
+        raise ValueError("Time and hints cannot be negative")
+    if difficulty not in DIFFICULTY_MULTIPLIERS:
+        raise ValueError(f"Unknown difficulty: {difficulty}")
+
+    time_factor = 300 / (300 + time_taken)
+    hint_factor = max(0.25, 1 - (0.10 * hints_taken))
+    return round(1000 * DIFFICULTY_MULTIPLIERS[difficulty] * time_factor * hint_factor)
 
 def count_solutions(board, limit=2):
     for row in range(SIZE):

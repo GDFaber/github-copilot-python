@@ -17,7 +17,8 @@ app = Flask(__name__)
 CURRENT = {
     'puzzle': None,
     'solution': None,
-    'hint_count': 0
+    'hint_count': 0,
+    'difficulty': None
 }
 
 
@@ -132,6 +133,11 @@ def new_game():
     CURRENT['puzzle'] = puzzle
     CURRENT['solution'] = solution
     CURRENT['hint_count'] = 0
+    CURRENT['difficulty'] = next(
+        (name for name, clue_count in {'easy': 50, 'medium': 40, 'hard': 30}.items()
+         if clue_count == clues),
+        'medium'
+    )
     app.logger.info("Successfully generated puzzle with %d clues", clues)
     return jsonify({'puzzle': puzzle})
 
@@ -207,11 +213,20 @@ def check_solution():
             if board[i][j] != solution[i][j]:
                 incorrect.append([i, j])
 
+    response = {'incorrect': incorrect}
+    if not incorrect:
+        elapsed_seconds = max(0, int(data.get('time_taken', 0)))
+        response['score'] = sudoku_logic.calculate_score(
+            elapsed_seconds,
+            CURRENT['hint_count'],
+            CURRENT['difficulty'] or 'medium'
+        )
+
     app.logger.info(
         "Solution check completed: %d incorrect cells found",
         len(incorrect)
     )
-    return jsonify({'incorrect': incorrect})
+    return jsonify(response)
 
 
 if __name__ == '__main__':

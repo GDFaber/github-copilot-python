@@ -63,6 +63,20 @@ class TestSudokuLogic(unittest.TestCase):
         with self.assertRaises(ValueError):
             sudoku_logic.validate_clues(sudoku_logic.MAX_CLUES + 1)
 
+    def test_calculate_score_applies_time_hints_and_difficulty(self):
+        self.assertEqual(sudoku_logic.calculate_score(0, 0, 'easy'), 1000)
+        self.assertEqual(sudoku_logic.calculate_score(300, 0, 'medium'), 675)
+        self.assertEqual(sudoku_logic.calculate_score(0, 2, 'hard'), 1440)
+
+    def test_calculate_score_limits_hint_penalty(self):
+        self.assertEqual(sudoku_logic.calculate_score(0, 10, 'easy'), 250)
+
+    def test_calculate_score_rejects_invalid_values(self):
+        with self.assertRaises(ValueError):
+            sudoku_logic.calculate_score(-1, 0, 'easy')
+        with self.assertRaises(ValueError):
+            sudoku_logic.calculate_score(0, 0, 'expert')
+
 
     def test_count_solutions_stops_at_limit_for_empty_board(self):
         board = sudoku_logic.create_empty_board()
