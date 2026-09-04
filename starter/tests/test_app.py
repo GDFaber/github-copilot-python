@@ -111,7 +111,52 @@ class AppTestCase(unittest.TestCase):
 
         # Now, check the solution with the correct board (no incorrect cells)
         self._check_board(solution, 200, "incorrect", [])
-        
+
+    def test_logging_to_app_log_file_when_debug_true(self):
+        # Set app.debug to True to enable INFO logging
+        app.debug = True
+        try:
+            response = self.app.get('/new?clues=30')
+            self.assertEqual(response.status_code, 200)
+
+            # Verify app.log contains INFO logs
+            import os
+            self.assertTrue(os.path.exists('app.log'))
+            with open('app.log', 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            self.assertIn('app.py', content)
+            self.assertIn('Response Code: 200', content)
+            self.assertIn('GET /new?clues=30', content)
+        finally:
+            app.debug = False
+
+    def test_logging_info_omitted_when_debug_false(self):
+        # Ensure app.debug is False
+        app.debug = False
+
+        # Clear log file content for clean assertion
+        with open('app.log', 'w', encoding='utf-8') as f:
+            f.truncate(0)
+
+        # Make an INFO request and a WARNING request
+        response_ok = self.app.get('/new?clues=30')
+        self.assertEqual(response_ok.status_code, 200)
+
+        response_warn = self.app.get('/new?clues=16')
+        self.assertEqual(response_warn.status_code, 400)
+
+        with open('app.log', 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # INFO logs should be omitted when debug is False
+        self.assertNotIn('GET /new?clues=30', content)
+        self.assertNotIn('[INFO]', content)
+
+        # WARNING logs should still be included
+        self.assertIn('[WARNING]', content)
+        self.assertIn('Invalid clue parameter', content)
+
 
 if __name__ == '__main__':
     unittest.main()
