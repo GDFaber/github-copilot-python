@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app import app
 from sudoku_logic import SIZE
@@ -53,7 +54,29 @@ class AppTestCase(unittest.TestCase):
 
 
     def test_new_game_route_with_clues_arg(self):
-        self._assert_new_game_puzzle('/new?clues=10', 10)
+        puzzle = [[0 for _ in range(SIZE)] for _ in range(SIZE)]
+        solution = [[1 for _ in range(SIZE)] for _ in range(SIZE)]
+        for index in range(20):
+            puzzle[index // SIZE][index % SIZE] = 1
+
+        with patch("sudoku_logic.generate_puzzle", return_value=(puzzle, solution)) as generate_mock:
+            self._assert_new_game_puzzle('/new?clues=20', 20)
+
+        generate_mock.assert_called_once_with(20)
+
+
+    def test_new_game_route_rejects_non_integer_clues(self):
+        response = self.app.get('/new?clues=abc')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'error': 'Clues must be between 17 and 81'})
+
+
+    def test_new_game_route_rejects_clues_below_known_minimum(self):
+        response = self.app.get('/new?clues=16')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'error': 'Clues must be between 17 and 81'})
 
 
     def test_check_route_without_game(self):

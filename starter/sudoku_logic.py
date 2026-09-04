@@ -3,6 +3,9 @@ import random
 
 SIZE = 9
 EMPTY = 0
+MIN_CLUES = 17
+MAX_CLUES = SIZE * SIZE
+MAX_GENERATION_ATTEMPTS = 20
 
 def deep_copy(board):
     return copy.deepcopy(board)
@@ -24,6 +27,25 @@ def is_safe(board, row, col, num):
                 return False
     return True
 
+def validate_clues(clues):
+    if not isinstance(clues, int) or not MIN_CLUES <= clues <= MAX_CLUES:
+        raise ValueError(f"Clues must be between {MIN_CLUES} and {MAX_CLUES}")
+
+def count_solutions(board, limit=2):
+    for row in range(SIZE):
+        for col in range(SIZE):
+            if board[row][col] == EMPTY:
+                solutions = 0
+                for candidate in range(1, SIZE + 1):
+                    if is_safe(board, row, col, candidate):
+                        board[row][col] = candidate
+                        solutions += count_solutions(board, limit - solutions)
+                        board[row][col] = EMPTY
+                        if solutions >= limit:
+                            return solutions
+                return solutions
+    return 1
+
 def fill_board(board):
     for row in range(SIZE):
         for col in range(SIZE):
@@ -40,18 +62,43 @@ def fill_board(board):
     return True
 
 def remove_cells(board, clues):
-    attempts = SIZE * SIZE - clues
-    while attempts > 0:
-        row = random.randrange(SIZE)
-        col = random.randrange(SIZE)
-        if board[row][col] != EMPTY:
+    validate_clues(clues)
+    cells_to_remove = MAX_CLUES - clues
+    positions = [(row, col) for row in range(SIZE) for col in range(SIZE)]
+
+    while cells_to_remove > 0:
+        random.shuffle(positions)
+        removed_this_pass = False
+
+        for row, col in positions:
+            if board[row][col] == EMPTY:
+                continue
+
+            removed = board[row][col]
             board[row][col] = EMPTY
-            attempts -= 1
+            if count_solutions(board) == 1:
+                cells_to_remove -= 1
+                removed_this_pass = True
+                if cells_to_remove == 0:
+                    return
+            else:
+                board[row][col] = removed
+
+        if not removed_this_pass:
+            raise RuntimeError("Unable to generate a puzzle with a unique solution")
 
 def generate_puzzle(clues=35):
-    board = create_empty_board()
-    fill_board(board)
-    solution = deep_copy(board)
-    remove_cells(board, clues)
-    puzzle = deep_copy(board)
-    return puzzle, solution
+    validate_clues(clues)
+
+    for _ in range(MAX_GENERATION_ATTEMPTS):
+        board = create_empty_board()
+        fill_board(board)
+        solution = deep_copy(board)
+        try:
+            remove_cells(board, clues)
+        except RuntimeError:
+            continue
+        puzzle = deep_copy(board)
+        return puzzle, solution
+
+    raise RuntimeError("Unable to generate a puzzle with a unique solution")

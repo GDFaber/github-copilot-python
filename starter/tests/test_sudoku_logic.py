@@ -54,6 +54,22 @@ class TestSudokuLogic(unittest.TestCase):
         self.assertTrue(sudoku_logic.is_safe(board, 0, 0, 4))
 
 
+    def test_validate_clues_rejects_below_known_minimum(self):
+        with self.assertRaises(ValueError):
+            sudoku_logic.validate_clues(sudoku_logic.MIN_CLUES - 1)
+
+
+    def test_validate_clues_rejects_above_cell_count(self):
+        with self.assertRaises(ValueError):
+            sudoku_logic.validate_clues(sudoku_logic.MAX_CLUES + 1)
+
+
+    def test_count_solutions_stops_at_limit_for_empty_board(self):
+        board = sudoku_logic.create_empty_board()
+
+        self.assertEqual(sudoku_logic.count_solutions(board), 2)
+
+
     def test_fill_board_returns_true_for_already_full_board(self):
         board = [[1 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
 
@@ -112,21 +128,23 @@ class TestSudokuLogic(unittest.TestCase):
         board = [[5 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
         before = copy.deepcopy(board)
 
-        sudoku_logic.remove_cells(board, sudoku_logic.SIZE * sudoku_logic.SIZE)
+        sudoku_logic.remove_cells(board, sudoku_logic.MAX_CLUES)
 
         self.assertEqual(board, before)
 
 
-    def test_remove_cells_removes_only_when_selected_cell_is_not_empty(self):
-        board = sudoku_logic.create_empty_board()
-        board[0][0] = 7
-        board[0][1] = 8
+    def test_remove_cells_keeps_removal_only_when_puzzle_stays_unique(self):
+        board = [[5 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
 
-        # Coordinates: (0,0) remove, (0,0) already empty, (0,1) remove
-        with patch("sudoku_logic.random.randrange", side_effect=[0, 0, 0, 0, 0, 1]):
-            sudoku_logic.remove_cells(board, 79)
+        def fake_shuffle(positions):
+            positions[:] = [(0, 0), (0, 1)]
 
-        self.assertEqual(board[0][0], sudoku_logic.EMPTY)
+        with patch("sudoku_logic.random.shuffle", side_effect=fake_shuffle), patch(
+            "sudoku_logic.count_solutions", side_effect=[2, 1]
+        ):
+            sudoku_logic.remove_cells(board, sudoku_logic.MAX_CLUES - 1)
+
+        self.assertEqual(board[0][0], 5)
         self.assertEqual(board[0][1], sudoku_logic.EMPTY)
 
 
@@ -152,6 +170,23 @@ class TestSudokuLogic(unittest.TestCase):
         self.assertIsNot(puzzle, solution)
         fill_mock.assert_called_once_with(seed_board)
         remove_mock.assert_called_once_with(seed_board, 40)
+
+
+    def test_generate_puzzle_retries_when_unique_removal_fails(self):
+        boards = [sudoku_logic.create_empty_board(), sudoku_logic.create_empty_board()]
+
+        def fake_fill_board(board):
+            board[0][0] = 9
+            return True
+
+        with patch("sudoku_logic.create_empty_board", side_effect=boards), patch(
+            "sudoku_logic.fill_board", side_effect=fake_fill_board
+        ), patch("sudoku_logic.remove_cells", side_effect=[RuntimeError, None]) as remove_mock:
+            puzzle, solution = sudoku_logic.generate_puzzle(clues=40)
+
+        self.assertEqual(remove_mock.call_count, 2)
+        self.assertEqual(solution[0][0], 9)
+        self.assertEqual(puzzle[0][0], 9)
 
 
 if __name__ == "__main__":

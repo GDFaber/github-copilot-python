@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask, render_template, jsonify, request
 import sudoku_logic
 
@@ -15,8 +17,15 @@ def index():
 
 @app.route('/new')
 def new_game():
-    clues = int(request.args.get('clues', 35))
-    puzzle, solution = sudoku_logic.generate_puzzle(clues)
+    try:
+        clues = int(request.args.get('clues', 35))
+        puzzle, solution = sudoku_logic.generate_puzzle(clues)
+    except (TypeError, ValueError):
+        return jsonify({'error': f'Clues must be between {sudoku_logic.MIN_CLUES} and {sudoku_logic.MAX_CLUES}'}), 400
+    except RuntimeError:
+        logging.exception('Puzzle generation failed for clues=%s', request.args.get('clues', 35))
+        return jsonify({'error': 'Internal server error'}), 500
+
     CURRENT['puzzle'] = puzzle
     CURRENT['solution'] = solution
     return jsonify({'puzzle': puzzle})
