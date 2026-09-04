@@ -223,6 +223,7 @@ function createBoardElement() {
         const value = rawValue.replace(/[^1-9]/g, '').slice(0, 1);
         e.target.value = value;
         e.target.classList.remove('incorrect');
+        e.target.classList.remove('player-filled');
 
         const message = document.getElementById('message');
         const conflicts = validateBoardConflicts(getBoardInputs());
@@ -350,7 +351,7 @@ async function checkSolution() {
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
     if (inp.disabled) continue;
-    inp.className = 'sudoku-cell';
+    inp.className = inp.value ? 'sudoku-cell player-filled' : 'sudoku-cell';
     if (incorrect.has(idx)) {
       inp.className = 'sudoku-cell incorrect';
     }
@@ -378,6 +379,8 @@ window.addEventListener('load', () => {
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   document.getElementById('hint-button').addEventListener('click', requestHint);
   renderTop10(loadTop10());
-  // initialize
-  newGame();
+  // initialize with an empty grid and no active game
+  createBoardElement();
+  document.getElementById('check-solution').disabled = true;
+  document.getElementById('hint-button').disabled = true;
 });
