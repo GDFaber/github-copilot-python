@@ -101,13 +101,15 @@ starter/
 - Display validation errors, success messages, and incorrect cells.
 - Handle network failures and invalid server responses gracefully.
 
-The browser client is organized around focused components in `static/main.js`:
-`Api` handles HTTP and response normalization, `Board` owns board rendering and
-client-side conflict feedback, `Clock` owns elapsed time, and `Scores` owns
-local leaderboard persistence and rendering. `App` composes these components
-and coordinates user actions. API failures must remain user-friendly and must
-leave controls in a recoverable state. The HTML provides semantic landmarks,
-grid labels, and live status announcements; the stylesheet owns all visual
+The browser client is organized around focused components in separate files:
+`Api.js` handles HTTP and response normalization, `Board.js` owns board
+rendering and client-side conflict feedback, `Clock.js` owns elapsed time,
+`Scores.js` owns local leaderboard persistence and rendering, and `App.js`
+composes these components and coordinates user actions. Shared constants live
+in `Definitions.js`, reusable functions live in `helper.js`, and `main.js` is only the
+bootstrap entry point. API failures must remain user-friendly and must leave
+controls in a recoverable state. The HTML provides semantic landmarks, grid
+labels, and live status announcements; the stylesheet owns all visual
 presentation and responsive layout.
 
 ### Separation of Concerns
