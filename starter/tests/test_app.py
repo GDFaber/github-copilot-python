@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import app
+from app import app, create_app
 from sudoku_logic import SIZE
 
 
@@ -122,6 +122,56 @@ class AppTestCase(unittest.TestCase):
 
         # Now, check the solution with the correct board (no incorrect cells)
         self._check_board(solution, 200, "incorrect", [])
+
+    def test_check_route_rejects_invalid_board_shape(self):
+        self.app.get('/new')
+
+        response = self.app.post('/check', json={'board': [[0]]})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'error': 'Board must be 9x9'})
+
+    def test_check_route_rejects_invalid_cell_value(self):
+        self.app.get('/new')
+        board = [[0 for _ in range(SIZE)] for _ in range(SIZE)]
+        board[0][0] = 10
+
+        response = self.app.post('/check', json={'board': board})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'error': 'Cell values must be 0-9'})
+
+    def test_check_route_rejects_malformed_json(self):
+        self.app.get('/new')
+
+        response = self.app.post(
+            '/check',
+            data='{"board":',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {'error': 'Invalid JSON'})
+
+    def test_api_rejects_wrong_method_with_json(self):
+        response = self.app.get('/check')
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.get_json(), {'error': 'Method not allowed'})
+
+    def test_create_app_accepts_isolated_game_state(self):
+        isolated_state = {
+            'puzzle': None,
+            'solution': None,
+            'hint_count': 0,
+            'difficulty': None,
+        }
+        isolated_client = create_app(isolated_state).test_client()
+
+        response = isolated_client.get('/new?clues=50')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(isolated_state['solution'])
 
     def test_check_route_returns_verified_top10_entry_for_a_solved_game(self):
         self.app.get('/new?clues=50')

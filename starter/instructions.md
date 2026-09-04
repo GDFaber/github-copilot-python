@@ -120,6 +120,12 @@ The current application is simple and does not require Application Factory or Bl
 - Game session (puzzle and solution) stored in module-level dictionary `CURRENT`.
 - All routes defined in a single module for clarity and ease of testing.
 
+The implementation uses `create_app(state=None)` as a lightweight application
+factory. `app.py` composes the Flask routes and error handlers, while
+`request_validation.py` owns HTTP payload validation and `game_service.py`
+owns game state transitions. The module-level `app` and `CURRENT` remain as
+development and backwards-compatibility entry points.
+
 ### Key Constraints
 
 - Do not introduce global mutable state beyond `CURRENT` without clear justification.
