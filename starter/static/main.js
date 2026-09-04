@@ -359,6 +359,7 @@ async function checkSolution() {
   if (incorrect.size === 0) {
     stopTimer();
     document.getElementById('check-solution').disabled = true;
+    document.getElementById('hint-button').disabled = true;
     msg.style.color = '#388e3c';
     msg.innerText = `Congratulations! You solved it! Score: ${data.score}`;
     await submitTop10Entry(data.entry);
