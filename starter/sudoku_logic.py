@@ -1,5 +1,3 @@
-"""Pure Sudoku board generation, validation, and scoring logic."""
-
 import copy
 import random
 
@@ -15,15 +13,12 @@ DIFFICULTY_MULTIPLIERS = {
 }
 
 def deep_copy(board):
-    """Return an independent copy of a Sudoku board."""
     return copy.deepcopy(board)
 
 def create_empty_board():
-    """Return a new 9x9 board filled with empty cells."""
     return [[EMPTY for _ in range(SIZE)] for _ in range(SIZE)]
 
 def is_safe(board, row, col, num):
-    """Return whether ``num`` can be placed at the given coordinates."""
     # Check row and column
     for x in range(SIZE):
         if board[row][x] == num or board[x][col] == num:
@@ -38,8 +33,7 @@ def is_safe(board, row, col, num):
     return True
 
 def validate_clues(clues):
-    """Raise ``ValueError`` when a clue count is outside the supported range."""
-    if isinstance(clues, bool) or not isinstance(clues, int) or not MIN_CLUES <= clues <= MAX_CLUES:
+    if not isinstance(clues, int) or not MIN_CLUES <= clues <= MAX_CLUES:
         raise ValueError(f"Clues must be between {MIN_CLUES} and {MAX_CLUES}")
 
 def calculate_score(time_taken, hints_taken, difficulty):
@@ -54,7 +48,6 @@ def calculate_score(time_taken, hints_taken, difficulty):
     return round(1000 * DIFFICULTY_MULTIPLIERS[difficulty] * time_factor * hint_factor)
 
 def count_solutions(board, limit=2):
-    """Count board completions, stopping once ``limit`` is reached."""
     for row in range(SIZE):
         for col in range(SIZE):
             if board[row][col] == EMPTY:
@@ -70,7 +63,6 @@ def count_solutions(board, limit=2):
     return 1
 
 def fill_board(board):
-    """Fill a board in place using randomized backtracking."""
     for row in range(SIZE):
         for col in range(SIZE):
             if board[row][col] == EMPTY:
@@ -86,7 +78,6 @@ def fill_board(board):
     return True
 
 def remove_cells(board, clues):
-    """Remove cells in place while preserving a unique puzzle solution."""
     validate_clues(clues)
     cells_to_remove = MAX_CLUES - clues
     positions = [(row, col) for row in range(SIZE) for col in range(SIZE)]
@@ -113,13 +104,11 @@ def remove_cells(board, clues):
             raise RuntimeError("Unable to generate a puzzle with a unique solution")
 
 def generate_puzzle(clues=35):
-    """Return a uniquely solvable puzzle and its complete solution."""
     validate_clues(clues)
 
     for _ in range(MAX_GENERATION_ATTEMPTS):
         board = create_empty_board()
-        if not fill_board(board):
-            continue
+        fill_board(board)
         solution = deep_copy(board)
         try:
             remove_cells(board, clues)
