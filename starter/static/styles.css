@@ -5,6 +5,8 @@
 :root {
     color-scheme: light dark;
     --cell-size: 40px;
+    --font-body: "Trebuchet MS", "Segoe UI", sans-serif;
+    --font-display: Georgia, "Times New Roman", serif;
     --page-background: #edf4fc;
     --text-color: #173b63;
     --board-border: #173b63;
@@ -94,7 +96,7 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: var(--font-body);
     background: var(--page-background);
     color: var(--text-color);
     text-align: center;
@@ -105,7 +107,12 @@ body {
     align-items: center;
 }
 
+main {
+    width: min(100%, 760px);
+}
+
 h1 {
+    font-family: var(--font-display);
     margin: 24px 0 16px;
     color: var(--text-color);
     font-size: clamp(1.6rem, 4vw, 2.2rem);
@@ -294,6 +301,14 @@ button:disabled:hover {
 }
 
 #message {
+    color: var(--error-color);
+}
+
+#message.success {
+    color: var(--success-color);
+}
+
+#message.error {
     color: var(--error-color);
 }
 

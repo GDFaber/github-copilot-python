@@ -1,387 +1,268 @@
-// Client-side rendering and interaction for the Flask-backed Sudoku
-const SIZE = 9;
-const THEME_STORAGE_KEY = 'sudoku-theme';
-const TOP10_STORAGE_KEY = 'sudoku-top10';
-const TOP10_LIMIT = 10;
-const CLUES_BY_DIFFICULTY = {
-  easy: 50,
-  medium: 40,
-  hard: 30
-};
-let puzzle = [];
-let timerInterval = null;
-let timerStart = 0;
+// Modular browser client for the Flask-backed Sudoku game.
+const SudokuApp = (() => {
+  const SIZE = 9;
+  const THEME_KEY = 'sudoku-theme';
+  const SCORES_KEY = 'sudoku-top10';
+  const CLUES = {easy: 50, medium: 40, hard: 30};
 
-function formatTime(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-function updateTimer() {
-  const elapsedSeconds = Math.floor((Date.now() - timerStart) / 1000);
-  document.getElementById('timer').innerText = `Time: ${formatTime(elapsedSeconds)}`;
-}
-
-function startTimer() {
-  if (timerInterval !== null) clearInterval(timerInterval);
-  timerStart = Date.now();
-  updateTimer();
-  timerInterval = setInterval(updateTimer, 1000);
-}
-
-function stopTimer() {
-  if (timerInterval !== null) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    updateTimer();
-  }
-}
-
-function renderTop10(entries) {
-  const tableBody = document.getElementById('top10-entries');
-  tableBody.innerHTML = '';
-  const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
-
-  for (const [index, entry] of entries.entries()) {
-    const row = document.createElement('tr');
-    const values = [
-      `${index + 1} ${medals[index] || ''}`.trim(),
-      entry.name,
-      entry.score,
-      formatTime(entry.time_taken),
-      entry.hints_used,
-      entry.difficulty
-    ];
-    for (const value of values) {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      row.appendChild(cell);
-    }
-    tableBody.appendChild(row);
-  }
-}
-
-function loadTop10() {
-  try {
-    const entries = JSON.parse(localStorage.getItem(TOP10_STORAGE_KEY) || '[]');
-    return Array.isArray(entries) ? entries : [];
-  } catch (_error) {
-    return [];
-  }
-}
-
-function saveTop10(entries) {
-  localStorage.setItem(TOP10_STORAGE_KEY, JSON.stringify(entries));
-}
-
-function requestPlayerName() {
-  const dialog = document.getElementById('top10-name-dialog');
-  const form = document.getElementById('top10-name-form');
-  const input = document.getElementById('top10-name-input');
-  const cancelButton = document.getElementById('top10-name-cancel');
-  input.value = '';
-
-  return new Promise((resolve) => {
-    const closeDialog = (name) => {
-      dialog.close();
-      form.removeEventListener('submit', submitName);
-      cancelButton.removeEventListener('click', cancelEntry);
-      resolve(name);
-    };
-    const submitName = (event) => {
-      event.preventDefault();
-      if (form.reportValidity()) closeDialog(input.value.trim());
-    };
-    const cancelEntry = () => closeDialog(null);
-
-    form.addEventListener('submit', submitName);
-    cancelButton.addEventListener('click', cancelEntry);
-    dialog.showModal();
-    input.focus();
-  });
-}
-
-async function submitTop10Entry(entry) {
-  const entries = loadTop10();
-  const qualifies = entries.length < TOP10_LIMIT || entry.score > entries[entries.length - 1].score;
-  if (!qualifies) return;
-
-  const name = await requestPlayerName();
-  if (name === null) return;
-
-  entries.push({...entry, name});
-  entries.sort((first, second) => second.score - first.score);
-  const top10 = entries.slice(0, TOP10_LIMIT);
-  saveTop10(top10);
-  renderTop10(top10);
-}
-
-function getBoardInputs() {
-  return Array.from(document.querySelectorAll('#sudoku-board .sudoku-cell'));
-}
-
-function clearMessage() {
-  const message = document.getElementById('message');
-  message.innerText = '';
-  message.style.color = '';
-}
-
-function clearInvalidFeedback(inputs = getBoardInputs()) {
-  for (const input of inputs) {
-    input.classList.remove('conflicting');
-    input.removeAttribute('title');
-  }
-  clearMessage();
-}
-
-function conflictDescription(conflictTypes) {
-  return `Conflicts with the same number in the ${conflictTypes.join(' and ')}.`;
-}
-
-function validateBoardConflicts(inputs) {
-  const conflicts = new Map();
-
-  for (const input of inputs) {
-    input.classList.remove('conflicting');
-    input.removeAttribute('title');
-  }
-
-  for (const input of inputs) {
-    const value = input.value;
-    if (!value) continue;
-
-    const row = Number(input.dataset.row);
-    const col = Number(input.dataset.col);
-    const conflictTypes = new Set();
-    const matchingInputs = [];
-
-    for (const otherInput of inputs) {
-      if (input === otherInput || otherInput.value !== value) continue;
-
-      const otherRow = Number(otherInput.dataset.row);
-      const otherCol = Number(otherInput.dataset.col);
-      if (otherRow === row) conflictTypes.add('row');
-      if (otherCol === col) conflictTypes.add('column');
-      if (Math.floor(otherRow / 3) === Math.floor(row / 3)
-          && Math.floor(otherCol / 3) === Math.floor(col / 3)) {
-        conflictTypes.add('3x3 box');
+  class Api {
+    async request(url, options = {}) {
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (_error) {
+        throw new Error('Unable to connect to the game server.');
       }
-      if (otherRow === row || otherCol === col
-          || (Math.floor(otherRow / 3) === Math.floor(row / 3)
-              && Math.floor(otherCol / 3) === Math.floor(col / 3))) {
-        matchingInputs.push(otherInput);
+      let data;
+      try {
+        data = await response.json();
+      } catch (_error) {
+        throw new Error('The server returned an invalid response.');
       }
+      if (!response.ok || data.error) throw new Error(this.message(data.error, response.status));
+      return data;
     }
 
-    if (conflictTypes.size > 0) {
-      conflicts.set(input, conflictTypes);
-      for (const matchingInput of matchingInputs) {
-        if (!conflicts.has(matchingInput)) conflicts.set(matchingInput, new Set());
-      }
+    message(serverMessage, status) {
+      const known = {
+        'No game in progress': 'Start a new game before using this control.',
+        'No empty cells remaining': 'There are no empty cells left for a hint.',
+        'Board must be 9x9': 'The board is incomplete. Fill every cell before checking.',
+        'Cell values must be 0-9': 'The board contains an invalid cell value.',
+      };
+      return known[serverMessage]
+        || (status >= 500 ? 'The game server encountered an error.' : 'Please check your input and try again.');
     }
-  }
 
-  for (const [input, conflictTypes] of conflicts) {
-    input.classList.add('conflicting');
-    input.title = conflictTypes.size > 0
-      ? conflictDescription([...conflictTypes])
-      : 'Conflicts with another number in this row, column, or 3x3 box.';
-  }
-
-  return conflicts;
-}
-
-function applyTheme(theme) {
-  const selectedTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system';
-  const root = document.documentElement;
-
-  if (selectedTheme === 'system') {
-    delete root.dataset.theme;
-  } else {
-    root.dataset.theme = selectedTheme;
-  }
-
-  localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
-}
-
-function createBoardElement() {
-  const boardDiv = document.getElementById('sudoku-board');
-  boardDiv.innerHTML = '';
-  for (let i = 0; i < SIZE; i++) {
-    const rowDiv = document.createElement('div');
-    rowDiv.className = 'sudoku-row';
-    for (let j = 0; j < SIZE; j++) {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.maxLength = 1;
-      input.className = 'sudoku-cell';
-      input.dataset.row = i;
-      input.dataset.col = j;
-      input.addEventListener('input', (e) => {
-        const rawValue = e.target.value;
-        const value = rawValue.replace(/[^1-9]/g, '').slice(0, 1);
-        e.target.value = value;
-        e.target.classList.remove('incorrect');
-        e.target.classList.remove('player-filled');
-
-        const message = document.getElementById('message');
-        const conflicts = validateBoardConflicts(getBoardInputs());
-        if (rawValue !== value) {
-          e.target.title = 'Enter a single digit from 1 to 9.';
-          message.style.color = '#d32f2f';
-          message.innerText = 'Enter a single digit from 1 to 9.';
-          return;
-        }
-
-        if (conflicts.has(e.target)) {
-          message.style.color = '#d32f2f';
-          message.innerText = conflictDescription([...conflicts.get(e.target)]);
-        } else {
-          clearMessage();
-        }
+    newGame(clues) { return this.request(`/new?clues=${encodeURIComponent(clues)}`); }
+    hint() { return this.request('/hint', {method: 'POST'}); }
+    check(board, timeTaken) {
+      return this.request('/check', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({board, time_taken: timeTaken}),
       });
-      rowDiv.appendChild(input);
-    }
-    boardDiv.appendChild(rowDiv);
-  }
-}
-
-function renderPuzzle(puz) {
-  puzzle = puz;
-  createBoardElement();
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  for (let i = 0; i < SIZE; i++) {
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = puzzle[i][j];
-      const inp = inputs[idx];
-      if (val !== 0) {
-        inp.value = val;
-        inp.disabled = true;
-        inp.className += ' prefilled';
-      } else {
-        inp.value = '';
-        inp.disabled = false;
-      }
     }
   }
-}
 
-async function newGame() {
-  startTimer();
-  clearInvalidFeedback();
-  const difficulty = document.getElementById('difficulty-select').value;
-  const clues = CLUES_BY_DIFFICULTY[difficulty];
-  const res = await fetch(`/new?clues=${clues}`);
-  const data = await res.json();
-  renderPuzzle(data.puzzle);
-  clearMessage();
-  document.getElementById('hint-count').innerText = 'Hints used: 0';
-  document.getElementById('hint-button').disabled = false;
-  document.getElementById('check-solution').disabled = false;
-}
-
-async function requestHint() {
-  const res = await fetch('/hint', {method: 'POST'});
-  const data = await res.json();
-  const msg = document.getElementById('message');
-  if (data.error) {
-    msg.style.color = '#d32f2f';
-    msg.innerText = data.error;
-    document.getElementById('hint-button').disabled = true;
-    return;
-  }
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  const idx = data.row * SIZE + data.col;
-  const inp = inputs[idx];
-  const replacesConflictingMove = inp.classList.contains('conflicting');
-  inp.value = data.value;
-  inp.disabled = true;
-  inp.className = 'sudoku-cell hinted';
-  if (replacesConflictingMove) {
-    const remainingConflicts = validateBoardConflicts(inputs);
-    if (remainingConflicts.size === 0) {
-      clearMessage();
-    } else {
-      const [remainingInput, conflictTypes] = remainingConflicts.entries().next().value;
-      msg.innerText = conflictTypes.size > 0
-        ? conflictDescription([...conflictTypes])
-        : remainingInput.title;
+  class Clock {
+    constructor(element) { this.element = element; this.startedAt = 0; this.interval = null; }
+    start() {
+      this.stop();
+      this.startedAt = Date.now();
+      this.render();
+      this.interval = setInterval(() => this.render(), 1000);
+    }
+    stop() { if (this.interval !== null) clearInterval(this.interval); this.interval = null; }
+    elapsed() { return this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0; }
+    render() { this.element.textContent = `Time: ${this.format(this.elapsed())}`; }
+    format(seconds) {
+      return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
     }
   }
-  document.getElementById('hint-count').innerText = `Hints used: ${data.hint_count}`;
-  const hasEmptyCell = Array.from(inputs).some((cell) => !cell.disabled);
-  if (!hasEmptyCell) {
-    document.getElementById('hint-button').disabled = true;
-  }
-}
 
-async function checkSolution() {
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  clearInvalidFeedback(inputs);
-  const board = [];
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = inputs[idx].value;
-      board[i][j] = val ? parseInt(val, 10) : 0;
+  class Board {
+    constructor(element, message) { this.element = element; this.message = message; }
+    inputs() { return [...this.element.querySelectorAll('.sudoku-cell')]; }
+    render(puzzle) {
+      this.element.replaceChildren();
+      puzzle.forEach((row, rowIndex) => {
+        const rowElement = document.createElement('div');
+        rowElement.className = 'sudoku-row';
+        rowElement.setAttribute('role', 'row');
+        row.forEach((value, columnIndex) => {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.inputMode = 'numeric';
+          input.maxLength = 1;
+          input.className = 'sudoku-cell';
+          input.dataset.row = rowIndex;
+          input.dataset.col = columnIndex;
+          input.setAttribute('aria-label', `Row ${rowIndex + 1}, column ${columnIndex + 1}`);
+          input.addEventListener('input', (event) => this.onInput(event));
+          if (value !== 0) {
+            input.value = value;
+            input.disabled = true;
+            input.classList.add('prefilled');
+          }
+          rowElement.appendChild(input);
+        });
+        this.element.appendChild(rowElement);
+      });
+    }
+    values() {
+      const inputs = this.inputs();
+      return Array.from({length: SIZE}, (_, row) => Array.from({length: SIZE}, (_, column) => {
+        const value = inputs[row * SIZE + column].value;
+        return value ? Number.parseInt(value, 10) : 0;
+      }));
+    }
+    clearFeedback() {
+      this.inputs().forEach((input) => { input.classList.remove('conflicting'); input.removeAttribute('title'); });
+      this.clearMessage();
+    }
+    clearMessage() { this.message.textContent = ''; this.message.className = ''; }
+    showMessage(text, type = 'error') { this.message.textContent = text; this.message.className = type; }
+    onInput(event) {
+      const input = event.target;
+      const raw = input.value;
+      const value = raw.replace(/[^1-9]/g, '').slice(0, 1);
+      input.value = value;
+      input.classList.remove('incorrect', 'player-filled');
+      const conflicts = this.findConflicts();
+      if (raw !== value) this.showMessage('Enter a single digit from 1 to 9.');
+      else if (conflicts.has(input)) this.showMessage(this.describe(conflicts.get(input)));
+      else this.clearMessage();
+    }
+    findConflicts() {
+      const inputs = this.inputs();
+      const conflicts = new Map();
+      inputs.forEach((input) => { input.classList.remove('conflicting'); input.removeAttribute('title'); });
+      inputs.forEach((input) => {
+        if (!input.value) return;
+        const row = Number(input.dataset.row);
+        const column = Number(input.dataset.col);
+        inputs.forEach((other) => {
+          if (input === other || input.value !== other.value) return;
+          const otherRow = Number(other.dataset.row);
+          const otherColumn = Number(other.dataset.col);
+          const sameRow = row === otherRow;
+          const sameColumn = column === otherColumn;
+          const sameBox = Math.floor(row / 3) === Math.floor(otherRow / 3)
+            && Math.floor(column / 3) === Math.floor(otherColumn / 3);
+          if (sameRow || sameColumn || sameBox) {
+            const types = conflicts.get(input) || new Set();
+            if (sameRow) types.add('row');
+            if (sameColumn) types.add('column');
+            if (sameBox) types.add('3x3 box');
+            conflicts.set(input, types);
+            conflicts.set(other, conflicts.get(other) || new Set());
+          }
+        });
+      });
+      conflicts.forEach((types, input) => { input.classList.add('conflicting'); input.title = this.describe(types); });
+      return conflicts;
+    }
+    describe(types) { return `Conflicts with the same number in the ${[...types].join(' and ')}.`; }
+  }
+
+  class Scores {
+    constructor(body, dialog) { this.body = body; this.dialog = dialog; }
+    load() { try { const data = JSON.parse(localStorage.getItem(SCORES_KEY) || '[]'); return Array.isArray(data) ? data : []; } catch (_error) { return []; } }
+    render(entries) {
+      this.body.replaceChildren();
+      entries.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        [index + 1, entry.name, entry.score, this.time(entry.time_taken), entry.hints_used, entry.difficulty]
+          .forEach((value) => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
+        this.body.appendChild(row);
+      });
+    }
+    async add(entry) {
+      const entries = this.load();
+      if (entries.length >= 10 && entry.score <= entries[entries.length - 1].score) return;
+      const name = await this.name();
+      if (name === null) return;
+      entries.push({...entry, name});
+      entries.sort((first, second) => second.score - first.score);
+      const top10 = entries.slice(0, 10);
+      try { localStorage.setItem(SCORES_KEY, JSON.stringify(top10)); } catch (_error) { /* UI still works. */ }
+      this.render(top10);
+    }
+    name() {
+      const form = document.getElementById('top10-name-form');
+      const input = document.getElementById('top10-name-input');
+      const cancel = document.getElementById('top10-name-cancel');
+      input.value = '';
+      return new Promise((resolve) => {
+        const close = (value) => { this.dialog.close(); form.removeEventListener('submit', submit); cancel.removeEventListener('click', abort); resolve(value); };
+        const submit = (event) => { event.preventDefault(); if (form.reportValidity()) close(input.value.trim()); };
+        const abort = () => close(null);
+        form.addEventListener('submit', submit); cancel.addEventListener('click', abort); this.dialog.showModal(); input.focus();
+      });
+    }
+    time(seconds) { return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`; }
+  }
+
+  class App {
+    constructor() {
+      this.api = new Api();
+      this.board = new Board(document.getElementById('sudoku-board'), document.getElementById('message'));
+      this.clock = new Clock(document.getElementById('timer'));
+      this.scores = new Scores(document.getElementById('top10-entries'), document.getElementById('top10-name-dialog'));
+      this.newButton = document.getElementById('new-game');
+      this.checkButton = document.getElementById('check-solution');
+      this.hintButton = document.getElementById('hint-button');
+    }
+    initialize() {
+      this.setupTheme();
+      this.newButton.addEventListener('click', () => this.newGame());
+      this.checkButton.addEventListener('click', () => this.check());
+      this.hintButton.addEventListener('click', () => this.hint());
+      this.board.render(Array.from({length: SIZE}, () => Array(SIZE).fill(0)));
+      this.scores.render(this.scores.load());
+    }
+    async newGame() {
+      this.setBusy(true);
+      this.board.clearFeedback();
+      let started = false;
+      try {
+        const difficulty = document.getElementById('difficulty-select').value;
+        const data = await this.api.newGame(CLUES[difficulty]);
+        this.board.render(data.puzzle);
+        this.clock.start();
+        started = true;
+        document.getElementById('hint-count').textContent = 'Hints used: 0';
+        this.board.clearMessage();
+      } catch (error) { this.board.showMessage(error.message); }
+      finally { this.setBusy(false); this.checkButton.disabled = !started; this.hintButton.disabled = !started; }
+    }
+    async hint() {
+      this.hintButton.disabled = true;
+      try {
+        const data = await this.api.hint();
+        const input = this.board.inputs()[data.row * SIZE + data.col];
+        input.value = data.value; input.disabled = true; input.className = 'sudoku-cell hinted';
+        this.board.findConflicts();
+        document.getElementById('hint-count').textContent = `Hints used: ${data.hint_count}`;
+        this.hintButton.disabled = !this.board.inputs().some((cell) => !cell.disabled);
+      } catch (error) { this.board.showMessage(error.message); }
+    }
+    async check() {
+      this.board.clearFeedback();
+      try {
+        const data = await this.api.check(this.board.values(), this.clock.elapsed());
+        const incorrect = new Set(data.incorrect.map(([row, column]) => row * SIZE + column));
+        this.board.inputs().forEach((input, index) => {
+          if (input.disabled) return;
+          input.className = input.value ? 'sudoku-cell player-filled' : 'sudoku-cell';
+          if (incorrect.has(index)) input.className = 'sudoku-cell incorrect';
+        });
+        if (incorrect.size === 0) {
+          this.clock.stop(); this.checkButton.disabled = true; this.hintButton.disabled = true;
+          this.board.showMessage(`Congratulations! You solved it! Score: ${data.score}`, 'success');
+          await this.scores.add(data.entry);
+        } else this.board.showMessage('Some cells are incorrect.');
+      } catch (error) { this.board.showMessage(error.message); }
+    }
+    setBusy(busy) { this.newButton.disabled = busy; this.checkButton.disabled = busy; this.hintButton.disabled = busy; }
+    setupTheme() {
+      const select = document.getElementById('theme-select');
+      let saved = 'system';
+      try { saved = localStorage.getItem(THEME_KEY) || 'system'; } catch (_error) { /* Use system theme. */ }
+      select.value = ['light', 'dark', 'system'].includes(saved) ? saved : 'system';
+      this.applyTheme(select.value);
+      select.addEventListener('change', (event) => this.applyTheme(event.target.value));
+    }
+    applyTheme(theme) {
+      const selected = ['light', 'dark', 'system'].includes(theme) ? theme : 'system';
+      if (selected === 'system') delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = selected;
+      try { localStorage.setItem(THEME_KEY, selected); } catch (_error) { /* Current page remains themed. */ }
     }
   }
-  const res = await fetch('/check', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      board,
-      time_taken: Math.floor((Date.now() - timerStart) / 1000)
-    })
-  });
-  const data = await res.json();
-  const msg = document.getElementById('message');
-  if (data.error) {
-    msg.style.color = '#d32f2f';
-    msg.innerText = data.error;
-    return;
-  }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
-  for (let idx = 0; idx < inputs.length; idx++) {
-    const inp = inputs[idx];
-    if (inp.disabled) continue;
-    inp.className = inp.value ? 'sudoku-cell player-filled' : 'sudoku-cell';
-    if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
-    }
-  }
-  if (incorrect.size === 0) {
-    stopTimer();
-    document.getElementById('check-solution').disabled = true;
-    document.getElementById('hint-button').disabled = true;
-    msg.style.color = '#388e3c';
-    msg.innerText = `Congratulations! You solved it! Score: ${data.score}`;
-    await submitTop10Entry(data.entry);
-  } else {
-    msg.style.color = '#d32f2f';
-    msg.innerText = 'Some cells are incorrect.';
-  }
-}
 
-// Wire buttons
-window.addEventListener('load', () => {
-  const themeSelect = document.getElementById('theme-select');
-  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'system';
-  themeSelect.value = ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system';
-  applyTheme(themeSelect.value);
-  themeSelect.addEventListener('change', (event) => applyTheme(event.target.value));
-  document.getElementById('new-game').addEventListener('click', newGame);
-  document.getElementById('check-solution').addEventListener('click', checkSolution);
-  document.getElementById('hint-button').addEventListener('click', requestHint);
-  renderTop10(loadTop10());
-  // initialize with an empty grid and no active game
-  createBoardElement();
-  document.getElementById('check-solution').disabled = true;
-  document.getElementById('hint-button').disabled = true;
-});
+  return {initialize: () => new App().initialize()};
+})();
+
+window.addEventListener('DOMContentLoaded', () => SudokuApp.initialize());

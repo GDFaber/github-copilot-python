@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <h1>Sudoku Game</h1>
-  <div id="sudoku-board"></div>
-  <div class="controls">
+  <main>
+    <h1>Sudoku Game</h1>
+    <div id="sudoku-board" role="grid" aria-label="Sudoku puzzle"></div>
+    <section class="controls" aria-label="Game controls">
     <div class="controls-buttons">
       <button id="new-game">New Game</button>
       <button id="check-solution" disabled>Check Solution</button>
@@ -31,12 +32,12 @@
         </select>
       </label>
     </div>
-    <div class="controls-status">
+    <div class="controls-status" aria-live="polite">
       <span id="timer" aria-live="off">Time: 00:00</span>
       <span id="hint-count">Hints used: 0</span>
-      <span id="message"></span>
+      <span id="message" role="status"></span>
     </div>
-  </div>
+    </section>
   <section class="top10" aria-labelledby="top10-heading">
     <h2 id="top10-heading">Top 10</h2>
     <table>
@@ -53,6 +54,7 @@
       <tbody id="top10-entries"></tbody>
     </table>
   </section>
+  </main>
   <dialog id="top10-name-dialog" aria-labelledby="top10-name-heading">
     <form method="dialog" id="top10-name-form">
       <h2 id="top10-name-heading">New Top 10 entry!</h2>
@@ -64,6 +66,6 @@
       </div>
     </form>
   </dialog>
-  <script src="/static/main.js"></script>
+  <script src="/static/main.js" defer></script>
 </body>
 </html>
