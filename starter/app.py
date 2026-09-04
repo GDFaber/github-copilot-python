@@ -7,15 +7,17 @@ Configures server-side logging to output formatted logs to 'app.log'.
 """
 
 import logging
+import random
 from flask import Flask, render_template, jsonify, request
 import sudoku_logic
 
 app = Flask(__name__)
 
-# Keep a simple in-memory store for current puzzle and solution
+# Keep a simple in-memory store for current puzzle, solution and hint count
 CURRENT = {
     'puzzle': None,
-    'solution': None
+    'solution': None,
+    'hint_count': 0
 }
 
 
@@ -129,8 +131,50 @@ def new_game():
 
     CURRENT['puzzle'] = puzzle
     CURRENT['solution'] = solution
+    CURRENT['hint_count'] = 0
     app.logger.info("Successfully generated puzzle with %d clues", clues)
     return jsonify({'puzzle': puzzle})
+
+
+@app.route('/hint', methods=['POST'])
+def hint():
+    """
+    Reveal the correct value for one random empty cell of the current puzzle.
+
+    Returns:
+        JSON object containing the row, column, value and updated hint count,
+        or an error message with HTTP status code.
+    """
+    puzzle = CURRENT.get('puzzle')
+    solution = CURRENT.get('solution')
+
+    if puzzle is None or solution is None:
+        app.logger.warning("Hint request failed: No game in progress | Response Code: 400")
+        return jsonify({'error': 'No game in progress'}), 400
+
+    empty_cells = [
+        (row, col)
+        for row in range(sudoku_logic.SIZE)
+        for col in range(sudoku_logic.SIZE)
+        if puzzle[row][col] == sudoku_logic.EMPTY
+    ]
+
+    if not empty_cells:
+        app.logger.warning("Hint request failed: No empty cells remaining | Response Code: 400")
+        return jsonify({'error': 'No empty cells remaining'}), 400
+
+    row, col = random.choice(empty_cells)
+    value = solution[row][col]
+    puzzle[row][col] = value
+    CURRENT['hint_count'] += 1
+
+    app.logger.info(
+        "Hint given for cell (%d, %d) | Total hints: %d",
+        row,
+        col,
+        CURRENT['hint_count']
+    )
+    return jsonify({'row': row, 'col': col, 'value': value, 'hint_count': CURRENT['hint_count']})
 
 
 @app.route('/check', methods=['POST'])

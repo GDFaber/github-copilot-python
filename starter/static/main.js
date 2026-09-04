@@ -8,6 +8,81 @@ const CLUES_BY_DIFFICULTY = {
 };
 let puzzle = [];
 
+function getBoardInputs() {
+  return Array.from(document.querySelectorAll('#sudoku-board .sudoku-cell'));
+}
+
+function clearMessage() {
+  const message = document.getElementById('message');
+  message.innerText = '';
+  message.style.color = '';
+}
+
+function clearInvalidFeedback(inputs = getBoardInputs()) {
+  for (const input of inputs) {
+    input.classList.remove('conflicting');
+    input.removeAttribute('title');
+  }
+  clearMessage();
+}
+
+function conflictDescription(conflictTypes) {
+  return `Conflicts with the same number in the ${conflictTypes.join(' and ')}.`;
+}
+
+function validateBoardConflicts(inputs) {
+  const conflicts = new Map();
+
+  for (const input of inputs) {
+    input.classList.remove('conflicting');
+    input.removeAttribute('title');
+  }
+
+  for (const input of inputs) {
+    const value = input.value;
+    if (!value) continue;
+
+    const row = Number(input.dataset.row);
+    const col = Number(input.dataset.col);
+    const conflictTypes = new Set();
+    const matchingInputs = [];
+
+    for (const otherInput of inputs) {
+      if (input === otherInput || otherInput.value !== value) continue;
+
+      const otherRow = Number(otherInput.dataset.row);
+      const otherCol = Number(otherInput.dataset.col);
+      if (otherRow === row) conflictTypes.add('row');
+      if (otherCol === col) conflictTypes.add('column');
+      if (Math.floor(otherRow / 3) === Math.floor(row / 3)
+          && Math.floor(otherCol / 3) === Math.floor(col / 3)) {
+        conflictTypes.add('3x3 box');
+      }
+      if (otherRow === row || otherCol === col
+          || (Math.floor(otherRow / 3) === Math.floor(row / 3)
+              && Math.floor(otherCol / 3) === Math.floor(col / 3))) {
+        matchingInputs.push(otherInput);
+      }
+    }
+
+    if (conflictTypes.size > 0) {
+      conflicts.set(input, conflictTypes);
+      for (const matchingInput of matchingInputs) {
+        if (!conflicts.has(matchingInput)) conflicts.set(matchingInput, new Set());
+      }
+    }
+  }
+
+  for (const [input, conflictTypes] of conflicts) {
+    input.classList.add('conflicting');
+    input.title = conflictTypes.size > 0
+      ? conflictDescription([...conflictTypes])
+      : 'Conflicts with another number in this row, column, or 3x3 box.';
+  }
+
+  return conflicts;
+}
+
 function applyTheme(theme) {
   const selectedTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system';
   const root = document.documentElement;
@@ -35,8 +110,26 @@ function createBoardElement() {
       input.dataset.row = i;
       input.dataset.col = j;
       input.addEventListener('input', (e) => {
-        const val = e.target.value.replace(/[^1-9]/g, '');
-        e.target.value = val;
+        const rawValue = e.target.value;
+        const value = rawValue.replace(/[^1-9]/g, '').slice(0, 1);
+        e.target.value = value;
+        e.target.classList.remove('incorrect');
+
+        const message = document.getElementById('message');
+        const conflicts = validateBoardConflicts(getBoardInputs());
+        if (rawValue !== value) {
+          e.target.title = 'Enter a single digit from 1 to 9.';
+          message.style.color = '#d32f2f';
+          message.innerText = 'Enter a single digit from 1 to 9.';
+          return;
+        }
+
+        if (conflicts.has(e.target)) {
+          message.style.color = '#d32f2f';
+          message.innerText = conflictDescription([...conflicts.get(e.target)]);
+        } else {
+          clearMessage();
+        }
       });
       rowDiv.appendChild(input);
     }
@@ -67,17 +160,57 @@ function renderPuzzle(puz) {
 }
 
 async function newGame() {
+  clearInvalidFeedback();
   const difficulty = document.getElementById('difficulty-select').value;
   const clues = CLUES_BY_DIFFICULTY[difficulty];
   const res = await fetch(`/new?clues=${clues}`);
   const data = await res.json();
   renderPuzzle(data.puzzle);
-  document.getElementById('message').innerText = '';
+  clearMessage();
+  document.getElementById('hint-count').innerText = 'Hints used: 0';
+  document.getElementById('hint-button').disabled = false;
+}
+
+async function requestHint() {
+  const res = await fetch('/hint', {method: 'POST'});
+  const data = await res.json();
+  const msg = document.getElementById('message');
+  if (data.error) {
+    msg.style.color = '#d32f2f';
+    msg.innerText = data.error;
+    document.getElementById('hint-button').disabled = true;
+    return;
+  }
+  const boardDiv = document.getElementById('sudoku-board');
+  const inputs = boardDiv.getElementsByTagName('input');
+  const idx = data.row * SIZE + data.col;
+  const inp = inputs[idx];
+  const replacesConflictingMove = inp.classList.contains('conflicting');
+  inp.value = data.value;
+  inp.disabled = true;
+  inp.className = 'sudoku-cell hinted';
+  if (replacesConflictingMove) {
+    const remainingConflicts = validateBoardConflicts(inputs);
+    if (remainingConflicts.size === 0) {
+      clearMessage();
+    } else {
+      const [remainingInput, conflictTypes] = remainingConflicts.entries().next().value;
+      msg.innerText = conflictTypes.size > 0
+        ? conflictDescription([...conflictTypes])
+        : remainingInput.title;
+    }
+  }
+  document.getElementById('hint-count').innerText = `Hints used: ${data.hint_count}`;
+  const hasEmptyCell = Array.from(inputs).some((cell) => !cell.disabled);
+  if (!hasEmptyCell) {
+    document.getElementById('hint-button').disabled = true;
+  }
 }
 
 async function checkSolution() {
   const boardDiv = document.getElementById('sudoku-board');
   const inputs = boardDiv.getElementsByTagName('input');
+  clearInvalidFeedback(inputs);
   const board = [];
   for (let i = 0; i < SIZE; i++) {
     board[i] = [];
@@ -126,6 +259,7 @@ window.addEventListener('load', () => {
   themeSelect.addEventListener('change', (event) => applyTheme(event.target.value));
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
+  document.getElementById('hint-button').addEventListener('click', requestHint);
   // initialize
   newGame();
 });
