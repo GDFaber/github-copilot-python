@@ -1,6 +1,20 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku
 const SIZE = 9;
+const THEME_STORAGE_KEY = 'sudoku-theme';
 let puzzle = [];
+
+function applyTheme(theme) {
+  const selectedTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system';
+  const root = document.documentElement;
+
+  if (selectedTheme === 'system') {
+    delete root.dataset.theme;
+  } else {
+    root.dataset.theme = selectedTheme;
+  }
+
+  localStorage.setItem(THEME_STORAGE_KEY, selectedTheme);
+}
 
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
@@ -98,6 +112,11 @@ async function checkSolution() {
 
 // Wire buttons
 window.addEventListener('load', () => {
+  const themeSelect = document.getElementById('theme-select');
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'system';
+  themeSelect.value = ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system';
+  applyTheme(themeSelect.value);
+  themeSelect.addEventListener('change', (event) => applyTheme(event.target.value));
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   // initialize
