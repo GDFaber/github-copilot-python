@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sudoku Game</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -9,26 +10,32 @@
   <h1>Sudoku Game</h1>
   <div id="sudoku-board"></div>
   <div class="controls">
-    <button id="new-game">New Game</button>
-    <button id="check-solution">Check Solution</button>
-    <button id="hint-button">Hint</button>
-    <label class="difficulty-control" for="difficulty-select">Difficulty
-      <select id="difficulty-select">
-        <option value="easy">Easy</option>
-        <option value="medium" selected>Medium</option>
-        <option value="hard">Hard</option>
-      </select>
-    </label>
-    <label class="theme-control" for="theme-select">Theme
-      <select id="theme-select" aria-label="Color theme">
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-        <option value="system" selected>System</option>
-      </select>
-    </label>
-    <span id="timer" aria-live="off">Time: 00:00</span>
-    <span id="hint-count">Hints used: 0</span>
-    <span id="message"></span>
+    <div class="controls-buttons">
+      <button id="new-game">New Game</button>
+      <button id="check-solution">Check Solution</button>
+      <button id="hint-button">Hint</button>
+    </div>
+    <div class="controls-selects">
+      <label class="difficulty-control" for="difficulty-select">Difficulty
+        <select id="difficulty-select">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <label class="theme-control" for="theme-select">Theme
+        <select id="theme-select" aria-label="Color theme">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system" selected>System</option>
+        </select>
+      </label>
+    </div>
+    <div class="controls-status">
+      <span id="timer" aria-live="off">Time: 00:00</span>
+      <span id="hint-count">Hints used: 0</span>
+      <span id="message"></span>
+    </div>
   </div>
   <section class="top10" aria-labelledby="top10-heading">
     <h2 id="top10-heading">Top 10</h2>
