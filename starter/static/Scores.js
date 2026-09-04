@@ -6,11 +6,15 @@
       const entries = modules.readStorage(modules.SCORES_KEY, []);
       return Array.isArray(entries) ? entries : [];
     }
+    formatPosition(index) {
+      const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+      return medals[index] ? `${index + 1} ${medals[index]}` : index + 1;
+    }
     render(entries) {
       this.body.replaceChildren();
       entries.forEach((entry, index) => {
         const row = document.createElement('tr');
-        [index + 1, entry.name, entry.score, modules.formatTime(entry.time_taken), entry.hints_used, entry.difficulty]
+        [this.formatPosition(index), entry.name, entry.score, modules.formatTime(entry.time_taken), entry.hints_used, entry.difficulty]
           .forEach((value) => { const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell); });
         this.body.appendChild(row);
       });
