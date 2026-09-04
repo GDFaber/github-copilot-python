@@ -30,6 +30,33 @@
     <span id="hint-count">Hints used: 0</span>
     <span id="message"></span>
   </div>
+  <section class="top10" aria-labelledby="top10-heading">
+    <h2 id="top10-heading">Top 10</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Place</th>
+          <th scope="col">Name</th>
+          <th scope="col">Score</th>
+          <th scope="col">Time</th>
+          <th scope="col">Hints</th>
+          <th scope="col">Difficulty</th>
+        </tr>
+      </thead>
+      <tbody id="top10-entries"></tbody>
+    </table>
+  </section>
+  <dialog id="top10-name-dialog" aria-labelledby="top10-name-heading">
+    <form method="dialog" id="top10-name-form">
+      <h2 id="top10-name-heading">New Top 10 entry!</h2>
+      <label for="top10-name-input">Enter your name (Cancel = no entry)</label>
+      <input id="top10-name-input" name="name" type="text" maxlength="30" required autofocus>
+      <div class="dialog-actions">
+        <button type="button" id="top10-name-cancel">Cancel</button>
+        <button type="submit">Add entry</button>
+      </div>
+    </form>
+  </dialog>
   <script src="/static/main.js"></script>
 </body>
 </html>

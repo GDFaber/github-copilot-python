@@ -216,11 +216,18 @@ def check_solution():
     response = {'incorrect': incorrect}
     if not incorrect:
         elapsed_seconds = max(0, int(data.get('time_taken', 0)))
-        response['score'] = sudoku_logic.calculate_score(
+        score = sudoku_logic.calculate_score(
             elapsed_seconds,
             CURRENT['hint_count'],
             CURRENT['difficulty'] or 'medium'
         )
+        response['entry'] = {
+            'score': score,
+            'time_taken': elapsed_seconds,
+            'hints_used': CURRENT['hint_count'],
+            'difficulty': CURRENT['difficulty'] or 'medium'
+        }
+        response['score'] = score
 
     app.logger.info(
         "Solution check completed: %d incorrect cells found",

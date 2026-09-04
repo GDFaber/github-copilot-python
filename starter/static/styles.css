@@ -20,6 +20,10 @@
     --button-disabled-text: #6b7d94;
     --success-color: #388e3c;
     --error-color: #d32f2f;
+    --leaderboard-alt-row: #dceafd;
+    --leaderboard-first: #fff0ae;
+    --leaderboard-second: #dde4eb;
+    --leaderboard-third: #f2d0b0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +48,10 @@
         --button-disabled-text: #7c8ba1;
         --success-color: #8fd19e;
         --error-color: #ff9aa4;
+        --leaderboard-alt-row: #2d4d6d;
+        --leaderboard-first: #6c5814;
+        --leaderboard-second: #4c5966;
+        --leaderboard-third: #704829;
     }
 }
 
@@ -68,6 +76,10 @@
     --button-disabled-text: #7c8ba1;
     --success-color: #8fd19e;
     --error-color: #ff9aa4;
+    --leaderboard-alt-row: #2d4d6d;
+    --leaderboard-first: #6c5814;
+    --leaderboard-second: #4c5966;
+    --leaderboard-third: #704829;
 }
 
 body {
@@ -226,4 +238,105 @@ button:disabled:hover {
     margin-left: 20px;
     font-size: 16px;
     color: var(--error-color);
+}
+
+.top10 {
+    margin: 32px auto;
+    max-width: 680px;
+    padding: 0 16px;
+}
+
+.top10 h2 {
+    margin-bottom: 12px;
+}
+
+.top10 table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--board-background);
+    color: var(--text-color);
+}
+
+.top10 th,
+.top10 td {
+    padding: 9px 8px;
+    border: 1px solid var(--cell-border);
+    text-align: left;
+}
+
+.top10 th {
+    background: var(--button-background);
+    color: #fff;
+}
+
+.top10 tbody tr:nth-child(even) {
+    background: var(--leaderboard-alt-row);
+}
+
+.top10 tbody tr:nth-child(1) {
+    background: var(--leaderboard-first);
+}
+
+.top10 tbody tr:nth-child(2) {
+    background: var(--leaderboard-second);
+}
+
+.top10 tbody tr:nth-child(3) {
+    background: var(--leaderboard-third);
+}
+
+#top10-name-dialog {
+    width: min(360px, calc(100% - 32px));
+    padding: 24px;
+    border: 1px solid var(--cell-border);
+    border-radius: 6px;
+    background: var(--board-background);
+    color: var(--text-color);
+    box-shadow: 0 8px 24px rgba(23, 59, 99, 0.3);
+}
+
+#top10-name-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#top10-name-dialog h2 {
+    margin: 0 0 16px;
+}
+
+#top10-name-dialog label,
+#top10-name-dialog input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#top10-name-dialog input {
+    margin-top: 6px;
+    padding: 8px;
+    border: 1px solid var(--cell-border);
+    border-radius: 4px;
+    background: var(--cell-color);
+    color: var(--text-color);
+    font: inherit;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.dialog-actions button {
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .top10 {
+        overflow-x: auto;
+    }
+
+    .top10 table {
+        min-width: 580px;
+    }
 }

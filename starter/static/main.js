@@ -1,6 +1,8 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku
 const SIZE = 9;
 const THEME_STORAGE_KEY = 'sudoku-theme';
+const TOP10_STORAGE_KEY = 'sudoku-top10';
+const TOP10_LIMIT = 10;
 const CLUES_BY_DIFFICULTY = {
   easy: 50,
   medium: 40,
@@ -34,6 +36,85 @@ function stopTimer() {
     timerInterval = null;
     updateTimer();
   }
+}
+
+function renderTop10(entries) {
+  const tableBody = document.getElementById('top10-entries');
+  tableBody.innerHTML = '';
+  const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+
+  for (const [index, entry] of entries.entries()) {
+    const row = document.createElement('tr');
+    const values = [
+      `${index + 1} ${medals[index] || ''}`.trim(),
+      entry.name,
+      entry.score,
+      formatTime(entry.time_taken),
+      entry.hints_used,
+      entry.difficulty
+    ];
+    for (const value of values) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    tableBody.appendChild(row);
+  }
+}
+
+function loadTop10() {
+  try {
+    const entries = JSON.parse(localStorage.getItem(TOP10_STORAGE_KEY) || '[]');
+    return Array.isArray(entries) ? entries : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function saveTop10(entries) {
+  localStorage.setItem(TOP10_STORAGE_KEY, JSON.stringify(entries));
+}
+
+function requestPlayerName() {
+  const dialog = document.getElementById('top10-name-dialog');
+  const form = document.getElementById('top10-name-form');
+  const input = document.getElementById('top10-name-input');
+  const cancelButton = document.getElementById('top10-name-cancel');
+  input.value = '';
+
+  return new Promise((resolve) => {
+    const closeDialog = (name) => {
+      dialog.close();
+      form.removeEventListener('submit', submitName);
+      cancelButton.removeEventListener('click', cancelEntry);
+      resolve(name);
+    };
+    const submitName = (event) => {
+      event.preventDefault();
+      if (form.reportValidity()) closeDialog(input.value.trim());
+    };
+    const cancelEntry = () => closeDialog(null);
+
+    form.addEventListener('submit', submitName);
+    cancelButton.addEventListener('click', cancelEntry);
+    dialog.showModal();
+    input.focus();
+  });
+}
+
+async function submitTop10Entry(entry) {
+  const entries = loadTop10();
+  const qualifies = entries.length < TOP10_LIMIT || entry.score > entries[entries.length - 1].score;
+  if (!qualifies) return;
+
+  const name = await requestPlayerName();
+  if (name === null) return;
+
+  entries.push({...entry, name});
+  entries.sort((first, second) => second.score - first.score);
+  const top10 = entries.slice(0, TOP10_LIMIT);
+  saveTop10(top10);
+  renderTop10(top10);
 }
 
 function getBoardInputs() {
@@ -198,6 +279,7 @@ async function newGame() {
   clearMessage();
   document.getElementById('hint-count').innerText = 'Hints used: 0';
   document.getElementById('hint-button').disabled = false;
+  document.getElementById('check-solution').disabled = false;
 }
 
 async function requestHint() {
@@ -275,8 +357,10 @@ async function checkSolution() {
   }
   if (incorrect.size === 0) {
     stopTimer();
+    document.getElementById('check-solution').disabled = true;
     msg.style.color = '#388e3c';
     msg.innerText = `Congratulations! You solved it! Score: ${data.score}`;
+    await submitTop10Entry(data.entry);
   } else {
     msg.style.color = '#d32f2f';
     msg.innerText = 'Some cells are incorrect.';
@@ -293,6 +377,7 @@ window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   document.getElementById('hint-button').addEventListener('click', requestHint);
+  renderTop10(loadTop10());
   // initialize
   newGame();
 });

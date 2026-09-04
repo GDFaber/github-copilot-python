@@ -9,6 +9,13 @@ class AppTestCase(unittest.TestCase):
     def setUp(self):
         self.app = app.test_client()
         self.app.testing = True
+        from app import CURRENT
+        CURRENT.update({
+            'puzzle': None,
+            'solution': None,
+            'hint_count': 0,
+            'difficulty': None
+        })
 
 
     def _assert_new_game_puzzle(self, url, expected_clues):
@@ -115,6 +122,19 @@ class AppTestCase(unittest.TestCase):
 
         # Now, check the solution with the correct board (no incorrect cells)
         self._check_board(solution, 200, "incorrect", [])
+
+    def test_check_route_returns_verified_top10_entry_for_a_solved_game(self):
+        self.app.get('/new?clues=50')
+        from app import CURRENT
+
+        response = self.app.post('/check', json={'board': CURRENT['solution'], 'time_taken': 120})
+
+        self.assertEqual(response.status_code, 200)
+        entry = response.get_json()['entry']
+        self.assertEqual(entry['time_taken'], 120)
+        self.assertEqual(entry['hints_used'], 0)
+        self.assertEqual(entry['difficulty'], 'easy')
+        self.assertIsInstance(entry['score'], int)
 
     def test_logging_to_app_log_file_when_debug_true(self):
         # Set app.debug to True to enable INFO logging
